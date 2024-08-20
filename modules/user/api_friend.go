@@ -350,12 +350,13 @@ func (f *Friend) friendApply(c *wkhttp.Context) {
 		req.Vercode = friend.SourceVercode
 	}
 
-	//验证code是否有效
-	err = source.CheckRequestAddFriendCode(req.Vercode, fromUID)
-	if err != nil {
-		c.ResponseError(err)
-		return
-	}
+	//验证code是否有效,xyvcard 2024.8.20
+	// err = source.CheckRequestAddFriendCode(req.Vercode, fromUID)
+	// if err != nil {
+	//	c.ResponseError(err)
+	//	return
+	//}
+	
 	// 设置token
 	token := util.GenerUUID()
 
