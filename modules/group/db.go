@@ -309,6 +309,13 @@ func (d *DB) QueryGroupsWithGroupNos(groupNos []string) ([]*Model, error) {
 	return models, err
 }
 
+// QueryGroupOwner 查询群主
+func (d *DB) QueryGroupOwner(groupNo string) (*MemberModel, error) {
+	var memberModel *MemberModel
+	_, err := d.session.Select("*").From("group_member").Where("role=1 and group_no=? and is_deleted=0", groupNo).Load(&memberModel)
+	return memberModel, err
+}
+
 // QueryMemberWithUID 查询群成员
 func (d *DB) QueryMemberWithUID(uid string, groupNo string) (*MemberModel, error) {
 	var memberModel *MemberModel

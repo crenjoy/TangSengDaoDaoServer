@@ -219,6 +219,11 @@ func (s *Service) GetGroupDetail(groupNo string, uid string) (*GroupResp, error)
 		s.Error("查询成员失败！", zap.Error(err))
 		return nil, err
 	}
+	groupOwner, err := s.db.QueryGroupOwner(groupNo)
+	if err != nil {
+		s.Error("查询群主失败！", zap.Error(err))
+		return nil, err
+	}		
 	quit := 0
 	if memberOfMe == nil {
 		quit = 1
@@ -231,6 +236,9 @@ func (s *Service) GetGroupDetail(groupNo string, uid string) (*GroupResp, error)
 	if memberOfMe != nil {
 		groupResp.Role = memberOfMe.Role
 		groupResp.ForbiddenExpirTime = memberOfMe.ForbiddenExpirTime
+	}
+	if groupOwner != nil {
+		groupResp.OwnerUid = groupOwner.Id
 	}
 	return groupResp, nil
 }
@@ -527,6 +535,7 @@ type GroupResp struct {
 	MemberCount              int       `json:"member_count"`                // 成员数量
 	OnlineCount              int       `json:"online_count"`                // 在线数量
 	Quit                     int       `json:"quit"`                        // 我是否已退出群聊
+	OwnerUid                 int64     `json:"owner_uid"`                   // 群主ID,xyvcard 2024.08.20
 	Role                     int       `json:"role"`                        // 我在群聊里的角色
 	ForbiddenExpirTime       int64     `json:"forbidden_expir_time"`        // 我在此群的禁言过期时间
 	AllowMemberPinnedMessage int       `json:"allow_member_pinned_message"` //是否允许群成员置顶消息
