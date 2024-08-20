@@ -1722,6 +1722,8 @@ func (g *Group) groupScanJoin(c *wkhttp.Context) {
 
 // 群主转让
 func (g *Group) transferGrouper(c *wkhttp.Context) {
+	operator := c.GetLoginUID()
+	operatorName := c.GetLoginName()
 	loginUID := c.MustGet("uid").(string)
 	loginName := c.MustGet("name").(string)
 	toUID := c.Param("to_uid")
@@ -1810,6 +1812,8 @@ func (g *Group) transferGrouper(c *wkhttp.Context) {
 			OldGrouperName: loginName,
 			NewGrouper:     toUID,
 			NewGrouperName: toUser.Name,
+			Operator:     operator,
+		    OperatorName: operatorName,
 		},
 	}, tx)
 	if err != nil {
