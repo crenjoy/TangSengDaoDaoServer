@@ -8,7 +8,7 @@ import (
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/base/event"
 	chservice "github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/channel/service"
-	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/source"
+	//"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/source"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
@@ -572,14 +572,16 @@ func (f *Friend) friendSure(c *wkhttp.Context) {
 	}()
 	version := f.ctx.GenSeq(common.FriendSeqKey)
 	if applyFriendModel == nil {
-		// 验证code
-		err = source.CheckSource(vercode)
-		if err != nil {
-			c.ResponseError(err)
-			return
-		}
+	// xycard 2024.08.21	
+//		// 验证code
+//		err = source.CheckSource(vercode)
+//		if err != nil {
+//			c.ResponseError(err)
+//			return
+//		}
+//
+//		util.CheckErr(err)
 
-		util.CheckErr(err)
 		err = f.db.InsertTx(&FriendModel{
 			UID:           loginUID,
 			ToUID:         applyUID,
