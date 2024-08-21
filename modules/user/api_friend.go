@@ -337,20 +337,21 @@ func (f *Friend) friendApply(c *wkhttp.Context) {
 			c.ResponseError(errors.New("查询好友信息错误"))
 			return
 		}
+		// 验证code是否有效,xyvcard 2024.8.21
 		if friend == nil {
-			f.Error("好友信息不存在", zap.String("to_uid", req.ToUID))
-			c.ResponseError(errors.New("好友信息不存在"))
-			return
+//			f.Error("好友信息不存在", zap.String("to_uid", req.ToUID))
+//			c.ResponseError(errors.New("好友信息不存在"))
+//			return
 		}
-		if friend.SourceVercode == "" {
-			f.Error("验证码不能为空", zap.String("to_uid", req.ToUID))
-			c.ResponseError(errors.New("验证码不能为空"))
-			return
-		}
-		req.Vercode = friend.SourceVercode
+//		if friend.SourceVercode == "" {
+//			f.Error("验证码不能为空", zap.String("to_uid", req.ToUID))
+//			c.ResponseError(errors.New("验证码不能为空"))
+//			return
+//		}
+//		req.Vercode = friend.SourceVercode
 	}
 
-	//验证code是否有效,xyvcard 2024.8.20
+	// 验证code是否有效,xyvcard 2024.8.20
 	// err = source.CheckRequestAddFriendCode(req.Vercode, fromUID)
 	// if err != nil {
 	//	c.ResponseError(err)
@@ -535,7 +536,9 @@ func (f *Friend) friendSure(c *wkhttp.Context) {
 	if remark == "" {
 		remark = fmt.Sprintf("我是%s", applyUser.Name)
 	}
-	if strings.TrimSpace(applyUID) == "" || strings.TrimSpace(vercode) == "" {
+	// vercode 不校验.  xyvcard 2024.08.21
+	// if strings.TrimSpace(applyUID) == "" || strings.TrimSpace(vercode) == "" {
+	if strings.TrimSpace(applyUID) == ""  {	
 		c.ResponseError(errors.New("好友申请无效或已过期！"))
 		return
 	}
@@ -674,7 +677,23 @@ func (f *Friend) friendSure(c *wkhttp.Context) {
 	// 发送确认消息给对方
 	err = f.ctx.SendCMD(config.MsgCMDReq{
 		CMD:         common.CMDFriendAccept,
-		Subscribers: []string{applyUID, loginUID},
+		// xycard 2024.08.21
+		ChannelID:   loginUID,
+		ChannelType: common.ChannelTypePerson.Uint8(),
+		//Subscribers: []string{applyUID, loginUID},
+		Param: map[string]interface{}{
+			"to_uid":    applyUID,
+			"from_uid":  loginUID,
+			"from_name": name,
+		},
+	})
+	// xycard 2024.08.21
+	err = f.ctx.SendCMD(config.MsgCMDReq{
+		CMD:         common.CMDFriendAccept,
+		// xycard 2024.08.21
+		ChannelID:   applyUID,
+		ChannelType: common.ChannelTypePerson.Uint8(),
+		//Subscribers: []string{applyUID, loginUID},
 		Param: map[string]interface{}{
 			"to_uid":    applyUID,
 			"from_uid":  loginUID,
