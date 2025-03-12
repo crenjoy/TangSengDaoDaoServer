@@ -167,6 +167,7 @@ func (u *User) Route(r *wkhttp.WKHttp) {
 
 		v.POST("/user/register", u.register)                 //用户注册
 		v.POST("/user/login", u.login)                       // 用户登录
+		v.POST("/user/tokenlogin", u.tokenLogin)                       // 用户登录
 		v.POST("/user/usernamelogin", u.usernameLogin)       // 用户名登录
 		v.POST("/user/usernameregister", u.usernameRegister) // 用户名注册
 
@@ -941,6 +942,51 @@ func (u *User) login(c *wkhttp.Context) {
 		c.ResponseError(errors.New("密码不正确！"))
 		return
 	}
+	u.execLoginAndRespose(userInfo, config.DeviceFlag(req.Flag), req.Device, loginSpanCtx, c)
+}
+
+// Token登录
+func (u *User) tokenLogin(c *wkhttp.Context) {
+
+	var req loginTokenReq
+	if err := c.BindJSON(&req); err != nil {
+		c.ResponseError(errors.New("请求数据格式有误！"))
+		return
+	}
+	if err := req.Check(); err != nil {
+		c.ResponseError(err)
+		return
+	}
+	
+	fmt.Println("req:", req)
+	
+	decryptKey := u.ctx.GetConfig().JmashJwt.DecryptKey
+	verifySignKey := u.ctx.GetConfig().JmashJwt.VerifySignKey
+	
+	fmt.Println("decryptKey:", decryptKey)
+	fmt.Println("verifySignKey:", verifySignKey)
+	
+	uid := "baadb073cbee47038bae1323e6fc6cb1";
+		
+	loginSpan := u.ctx.Tracer().StartSpan(
+		"login",
+		opentracing.ChildOf(c.GetSpanContext()),
+	)
+	loginSpanCtx := u.ctx.Tracer().ContextWithSpan(context.Background(), loginSpan)
+	loginSpan.SetTag("uid", uid)
+	defer loginSpan.Finish()
+
+	userInfo, err := u.db.QueryByUID(uid)
+	if err != nil {
+		u.Error("查询用户信息失败！", zap.String("uid", uid))
+		c.ResponseError(err)
+		return
+	}
+	if userInfo == nil || userInfo.IsDestroy == 1 {
+		c.ResponseError(errors.New("用户不存在"))
+		return
+	}
+	
 	u.execLoginAndRespose(userInfo, config.DeviceFlag(req.Flag), req.Device, loginSpanCtx, c)
 }
 
@@ -2647,6 +2693,22 @@ func (r loginReq) Check() error {
 	}
 	return nil
 }
+
+//Token登录信息
+type loginTokenReq struct {
+	Token string        `json:"token"`
+	Flag     int        `json:"flag"`   // 设备标示 0.APP 1.PC
+	Device   *deviceReq `json:"device"` //登录设备信息
+}
+
+//Token登录请求检查
+func (r loginTokenReq) Check() error {
+	if strings.TrimSpace(r.Token) == "" {
+		return errors.New("User Token 不能为空！")
+	}
+	return nil
+}
+
 
 type userResp struct {
 	UID     string `json:"uid"`
