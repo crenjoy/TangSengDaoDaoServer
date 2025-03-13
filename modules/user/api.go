@@ -990,12 +990,118 @@ func (u *User) tokenLogin(c *wkhttp.Context) {
 		c.ResponseError(err)
 		return
 	}
+	
+	if userInfo == nil {
+		userInfo, err = u.addTenantUser(jmashToken)
+		if err != nil {
+		   u.Error("注册Jmash用户信息失败！", zap.String("uid", uid))
+		   c.ResponseError(err)
+		   return
+	    }
+	}
+	
 	if userInfo == nil || userInfo.IsDestroy == 1 {
 		c.ResponseError(errors.New("用户不存在"))
 		return
 	}
 	
 	u.execLoginAndRespose(userInfo, config.DeviceFlag(req.Flag), req.Device, loginSpanCtx, c)
+}
+
+//根据JmashToken添加用户
+func (u *User) addTenantUser(jmashToken JmashToken) (*Model, error){
+    userInfo, err := u.db.QueryByUsername(fmt.Sprintf("%s-%s", jmashToken.Tenant, jmashToken.Subject))
+	if err != nil {
+		u.Error("查询用户信息失败！", zap.String("username", jmashToken.Subject))
+		return  nil,err
+	}
+	if userInfo != nil {
+		return userInfo,nil
+	}
+	var shortNo = ""
+	var shortNumStatus = 0
+	if u.ctx.GetConfig().ShortNo.NumOn {
+		shortNo, err = u.commonService.GetShortno()
+		if err != nil {
+			u.Error("获取短编号失败！", zap.Error(err))
+			return  nil,err
+		}
+	} else {
+		shortNo = util.Ten2Hex(time.Now().UnixNano())
+	}
+	if u.ctx.GetConfig().ShortNo.EditOff {
+		shortNumStatus = 1
+	}
+	tx, err := u.db.session.Begin()
+	if err != nil {
+		u.Error("开启事物错误", zap.Error(err))
+		return  nil,err
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			tx.Rollback()
+			panic(err)
+		}
+	}()
+	userModel := &Model{}
+	userModel.UID = jmashToken.UserId
+	userModel.Name = jmashToken.Subject
+	userModel.Vercode = fmt.Sprintf("%s@%d", util.GenerUUID(), common.User)
+	userModel.QRVercode = fmt.Sprintf("%s@%d", util.GenerUUID(), common.QRCode)
+	userModel.Phone = ""
+	userModel.Username = fmt.Sprintf("%s-%s", jmashToken.Tenant, jmashToken.Subject)
+	userModel.Zone = "0086"
+	userModel.Password = util.MD5(util.MD5("jmash123"))
+	userModel.ShortNo = shortNo
+	userModel.IsUploadAvatar = 0
+	userModel.NewMsgNotice = 1
+	userModel.MsgShowDetail = 1
+	userModel.SearchByPhone = 1
+	userModel.ShortStatus = shortNumStatus
+	userModel.SearchByShort = 1
+	userModel.VoiceOn = 1
+	userModel.ShockOn = 1
+	userModel.Sex = 1
+	userModel.Status = int(common.UserAvailable)
+	err = u.db.insertTx(userModel, tx)
+	if err != nil {
+		tx.Rollback()
+		u.Error("添加用户错误", zap.String("username", jmashToken.Subject))
+		return  nil,err
+	}
+	err = u.addSystemFriend(userModel.UID)
+	if err != nil {
+		tx.Rollback()
+		u.Error("添加后台生成用户和系统账号为好友关系失败！", zap.Error(err))
+		return  nil,err
+	}
+	err = u.addFileHelperFriend(userModel.UID)
+	if err != nil {
+		tx.Rollback()
+		u.Error("添加后台生成用户和文件助手为好友关系失败！", zap.Error(err))
+		return  nil,err
+	}
+	//发送用户注册事件
+	eventID, err := u.ctx.EventBegin(&wkevent.Data{
+		Event: event.EventUserRegister,
+		Type:  wkevent.Message,
+		Data: map[string]interface{}{
+			"uid": userModel.UID,
+		},
+	}, tx)
+	if err != nil {
+		tx.RollbackUnlessCommitted()
+		u.Error("开启事件失败！", zap.Error(err))
+		return  nil,err
+	}
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		u.Error("数据库事物提交失败", zap.Error(err))
+		return  nil,err
+	}
+	u.ctx.EventCommit(eventID)
+	return userModel,nil
 }
 
 // 验证登录用户信息
