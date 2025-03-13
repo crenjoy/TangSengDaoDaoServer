@@ -965,8 +965,16 @@ func (u *User) tokenLogin(c *wkhttp.Context) {
 	
 	fmt.Println("decryptKey:", decryptKey)
 	fmt.Println("verifySignKey:", verifySignKey)
+	// 验证 JWT
+    jmashToken,err := VerifyJWT(req.Token,decryptKey,verifySignKey)
+    if err != nil {
+        c.ResponseError(err)
+		return
+    }
+    
+    fmt.Println("JmashToken UserId:", jmashToken.UserId)
 	
-	uid := "baadb073cbee47038bae1323e6fc6cb1";
+	uid := jmashToken.UserId;
 		
 	loginSpan := u.ctx.Tracer().StartSpan(
 		"login",
